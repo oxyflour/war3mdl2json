@@ -1,0 +1,92 @@
+<body style="margin:0;padding:0;overflow:hidden">
+<div id="toolbar" style="position:absolute;left:0;top:0;padding:5;background:rgba(255,255,255,0.6);width:100%">
+	<select id="char" style="width:150px"></select>
+	<select id="anim"></select>
+	Models from <a href="http://www.baidu.com/s?wd=thdots">THDotS</a>
+</div>
+<script src="js/jquery.min.js"></script>
+<script src="js/three.js"></script>
+<script src="js/War3MdlLoader.js"></script>
+<script src="js/controls/OrbitControls.js"></script>
+<script>
+
+var game = (function(_t) {
+	_t.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 6000)
+	_t.camera.position.set(400, 0, 0)
+	_t.camera.lookAt(new THREE.Vector3())
+
+	_t.scene = new THREE.Scene()
+	_t.scene.add(_t.camera)
+	_t.scene.add(new THREE.AmbientLight(0xaaaaaa))
+
+	_t.renderer = new THREE.WebGLRenderer({ antialias:true })
+	_t.renderer.setClearColor(0x333333)
+	document.body.appendChild(_t.renderer.domElement)
+
+	_t.controls = new THREE.OrbitControls(_t.camera, _t.renderer.domElement)
+
+	return _t
+})({ })
+
+$(window).bind('resize', function(e) {
+	game.camera.aspect = window.innerWidth / window.innerHeight
+	game.camera.updateProjectionMatrix()
+	game.renderer.setSize(window.innerWidth, window.innerHeight)
+}).trigger('resize')
+
+var clock = new THREE.Clock()
+
+function render() {
+	requestAnimationFrame(render)
+	var dt = clock.getDelta()
+	THREE.AnimationHandler.update(dt)
+	game.controls.update(dt)
+	game.renderer.render(game.scene, game.camera)
+}
+render()
+
+</script>
+<script>
+
+if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.mdl', function(model) {
+	// move model to center
+	var box = new THREE.BoundingBoxHelper(model, 0xff0000)
+	model.rotation.x = -Math.PI/2
+	box.update()
+	model.position.y = -(box.box.min.y + box.box.max.y) / 2
+
+	// add model
+	game.scene.add(model)
+
+	// add another light
+	var light = new THREE.PointLight(0xaaaaaa)
+	light.position.set(box.box.max.x, box.box.max.z, 500)
+	game.scene.add(light)
+
+	// update animation options
+	var select = $('#anim')
+	select.change(function(e) {
+		model.playAnimation(this.value)
+	})
+	select.append('<option value="">Animate...</option>')
+	model.animations.forEach(function(d) {
+		select.append('<option value="'+d.name+'">'+d.name+'</option>')
+	})
+})
+
+$.get('mdls.txt', function(text) {
+	var select = $('#char')
+	select.change(function(e) {
+		location.search = this.value
+	})
+	select.append('<option value="">Select a character...</option>')
+	text.split('\n').forEach(function(d) {
+		var name = d.replace(/\r/g, '').replace(/\.mdl$/i, ''),
+			selected = decodeURIComponent(location.search.substr(1)) == name
+		if (name)
+			select.append('<option value="'+name+'" '+(selected ? '' : 'un')+'selected="true">'+name+'</option>')
+	})
+})
+
+</script>
+</body>
