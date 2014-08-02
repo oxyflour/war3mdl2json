@@ -12,6 +12,8 @@
 
 var game = (function(_t) {
 	_t.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 6000)
+	// the model is standing on the x-y plane and looking at the x-direction
+	_t.camera.up.set(0, 0, 1)
 	_t.camera.position.set(400, 0, 0)
 	_t.camera.lookAt(new THREE.Vector3())
 
@@ -51,16 +53,15 @@ render()
 if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.mdl', function(model) {
 	// move model to center
 	var box = new THREE.BoundingBoxHelper(model, 0xff0000)
-	model.rotation.x = -Math.PI/2
 	box.update()
-	model.position.y = -(box.box.min.y + box.box.max.y) / 2
+	model.position.z = -(box.box.min.z + box.box.max.z) / 2
 
 	// add model
 	game.scene.add(model)
 
 	// add another light
 	var light = new THREE.PointLight(0xaaaaaa)
-	light.position.set(box.box.max.x, box.box.max.z, 500)
+	light.position.copy(box.box.max)
 	game.scene.add(light)
 
 	// update animation options
