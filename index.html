@@ -55,7 +55,7 @@ render()
 </script>
 <script>
 
-if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.mdl', function(model) {
+if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.txt', function(model) {
 	// move model to center
 	var box = new THREE.BoundingBoxHelper(model, 0xff0000)
 	box.update()
@@ -88,7 +88,7 @@ $.get('mdls.txt', function(text) {
 	})
 	select.append('<option value="">Select a character...</option>')
 	text.split('\n').forEach(function(d) {
-		var name = d.replace(/\r/g, '').replace(/\.mdl$/i, ''),
+		var name = d.replace(/\r/g, '').replace(/\.txt$/i, ''),
 			selected = decodeURIComponent(location.search.substr(1)) == name
 		if (name)
 			select.append('<option value="'+name+'" '+(selected ? '' : 'un')+'selected="true">'+name+'</option>')
