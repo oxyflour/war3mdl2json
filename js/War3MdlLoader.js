@@ -172,7 +172,10 @@ function addFaces(array, object, flags) {
 				array.push(parseInt(object[i + j]))
 	}
 }
-function interpValue(prev, next, frame) {
+function interpValue(prev, next, frame, type) {
+	if (type == 'DontInterp')
+		return prev.value.slice()
+
 	var f = (frame - prev.frame) / (next.frame - prev.frame),
 		g = 1 - f
 		v = [ ]
@@ -193,7 +196,7 @@ function interpArray(array, frame) {
 	var prev = array[i - 1],
 		next = array[i]
 	if (prev && next)
-		return interpValue(prev, next, frame)
+		return interpValue(prev, next, frame, array.type)
 }
 function getKeys(bone, begin, end, gid) {
 	var frames = { }
@@ -231,35 +234,8 @@ function getKeys(bone, begin, end, gid) {
 			scl: [1, 1, 1]
 		})
 	}
-	keys.usedFrames = Math.max(translations.length, rotations.length)
+	keys.keyFrames = Math.max(translations.length, rotations.length)
 	return keys
-}
-function newAnim(bones, animation) {
-	var anim = { }
-	anim.global = animation.gid >= 0
-	anim.name = animation.name
-	anim.fps = 30
-	anim.length = (animation.end - animation.begin) / 1000
-	anim.hierarchy = [ ]
-	anim.usedKeyFrames = 0
-	for (var i = 0, d = null; d = bones[i]; i ++) {
-		var ks = getKeys(d, animation.begin, animation.end, animation.gid)
-		anim.usedKeyFrames = Math.max(anim.usedKeyFrames, ks.usedFrames)
-		for (var j = 0, e; e = ks[j]; j ++) {
-			// set time
-			e.time = (e.frame - animation.begin) / 1000
-			// must convert to relative positions here
-			e.pos = [ ]
-			e.pos[0] = e.trans[0] + d.rpos[0]
-			e.pos[1] = e.trans[1] + d.rpos[1]
-			e.pos[2] = e.trans[2] + d.rpos[2]
-		}
-		anim.hierarchy.push({
-			parent: d.parent,
-			keys: ks
-		})
-	}
-	return anim
 }
 function newBone(name, data, pivots) {
 	var bone = { }
@@ -294,6 +270,55 @@ function newBone(name, data, pivots) {
 		}
 	}
 	return bone
+}
+function newAnim(bones, animation) {
+	var anim = { }
+	anim.global = animation.gid >= 0
+	anim.name = animation.name
+	anim.fps = 30
+	anim.length = (animation.end - animation.begin) / 1000
+	anim.hierarchy = [ ]
+	anim.keyFrames = 0
+	anim.beginFrame = animation.begin
+	for (var i = 0, d = null; d = bones[i]; i ++) {
+		var ks = getKeys(d, animation.begin, animation.end, animation.gid)
+		anim.keyFrames = Math.max(anim.keyFrames, ks.keyFrames)
+		for (var j = 0, e; e = ks[j]; j ++) {
+			// set time
+			e.time = (e.frame - animation.begin) / 1000
+			// must convert to relative positions here
+			e.pos = [ ]
+			e.pos[0] = e.trans[0] + d.rpos[0]
+			e.pos[1] = e.trans[1] + d.rpos[1]
+			e.pos[2] = e.trans[2] + d.rpos[2]
+		}
+		anim.hierarchy.push({
+			parent: d.parent,
+			keys: ks
+		})
+	}
+	return anim
+}
+function newGeoAnim(data) {
+	// FIXME: only alpha is supported
+	var anim = { }
+	anim.alpha = [ ]
+	for (var i = 0, d = null; d = data[i]; i ++) {
+		if (d[0] == 'GeosetId') {
+			anim.target = parseInt(d[1])
+		}
+		else if (d[0] == 'Alpha') {
+			for (var j = 0, e; e = d[2][j]; j ++) {
+				if (e[0] == 'Linear' || e[0] == 'DontInterp')
+					anim.alpha.type == e[0]
+				else if (e[1] == ':') anim.alpha.push({
+					frame: parseInt(e[0]),
+					value: [parseFloat(e[2])]
+				})
+			}
+		}
+	}
+	return anim
 }
 function getGeometryJson(id, data, bones, animations) {
 	var json = {
@@ -412,6 +437,7 @@ THREE.LoadWar3Mdl = function(url, callback) {
 		// Geosets require Bones to build the geometry
 		var bones = [ ],
 			animations = [ ],
+			geoAnims = [ ],
 			textures = [ ],
 			materials = [ ]
 		for (var i = 0, o = null; o = object[i]; i ++) {
@@ -420,7 +446,7 @@ THREE.LoadWar3Mdl = function(url, callback) {
 					animations.push(newAnimation(d[1], d[2]))
 			})
 			else if (o[0] == 'GlobalSequences') o[2].forEach(function(d, i) {
-				// don't not why there are so many "Duration 0"
+				// do not known why there are so many "Duration 0"
 				if (d[0] == 'Duration' && parseInt(d[1]) > 0)
 					animations.push(newGlobalAnim(i, d[1]))
 			})
@@ -431,6 +457,9 @@ THREE.LoadWar3Mdl = function(url, callback) {
 				if (d[0] == 'Material')
 					materials.push(newMaterial(d[1]))
 			})
+			else if (o[0] == 'GeosetAnim') {
+				geoAnims.push(newGeoAnim(o[1]))
+			}
 			else if (o[0] == 'Bone' || o[0] == 'Helper') {
 				var bone = newBone(o[1], o[2], pivots)
 				bones['#' + bone.id] = bones.length
@@ -483,15 +512,9 @@ THREE.LoadWar3Mdl = function(url, callback) {
 
 				// setup global animation
 				data.extra.GlobalAnims.forEach(function(d) {
-					if (d.usedKeyFrames > 1)
+					if (d.keyFrames > 1)
 						new THREE.Animation(mesh, d).play()
 				})
-			}
-		}
-
-		for (var i = 0, o = null; o = object[i]; i ++) {
-			if (o[0] == 'GeosetAnim') {
-				// FIXME: to be finished
 			}
 		}
 
@@ -500,11 +523,12 @@ THREE.LoadWar3Mdl = function(url, callback) {
 				if (!mesh.animations)
 					mesh.animations = { }
 				if (!mesh.animations[name]) {
-					for (var i = 0, d; d = mesh.geometry.animations[i]; i ++)
+					for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
 						if (d && d.name == name) {
 							mesh.animations[name] = new THREE.Animation(mesh, d)
 							break
 						}
+					}
 				}
 				if (mesh.animPlaying !== mesh.animations[name]) {
 					if (mesh.animPlaying)
@@ -515,6 +539,18 @@ THREE.LoadWar3Mdl = function(url, callback) {
 			})
 		}
 
+		model.updateGeoAnim = function(dt) {
+			this.geoAnims.forEach(function(a) {
+				var mesh = model.children[a.target],
+					anim = mesh.animPlaying
+				if (anim) {
+					mesh.material.opacity = a.alpha.length > 0 ?
+						interpArray(a.alpha, anim.data.beginFrame + anim.currentTime*1000) : 1
+				}
+			})
+		}
+
+		model.geoAnims = geoAnims
 		model.animations = animations
 		callback(model)
 	})

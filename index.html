@@ -27,6 +27,8 @@ var game = (function(_t) {
 
 	_t.controls = new THREE.OrbitControls(_t.camera, _t.renderer.domElement)
 
+	_t.objects = [ ]
+
 	return _t
 })({ })
 
@@ -42,6 +44,9 @@ function render() {
 	requestAnimationFrame(render)
 	var dt = clock.getDelta()
 	THREE.AnimationHandler.update(dt)
+	game.objects.forEach(function(d) {
+		d.updateGeoAnim(dt)
+	})
 	game.controls.update(dt)
 	game.renderer.render(game.scene, game.camera)
 }
@@ -58,6 +63,7 @@ if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')
 
 	// add model
 	game.scene.add(model)
+	game.objects.push(model)
 
 	// add another light
 	var light = new THREE.PointLight(0xaaaaaa)
