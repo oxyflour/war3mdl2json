@@ -79,6 +79,8 @@ if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')
 	model.animations.forEach(function(d) {
 		select.append('<option value="'+d.name+'">'+d.name+'</option>')
 	})
+}, function(path) {
+	return 'png/' + path.split('\\').pop().replace(/\.\w+$/g, '.png')
 })
 
 $.get('mdls.txt', function(text) {

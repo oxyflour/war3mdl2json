@@ -420,7 +420,7 @@ function getGeometryJson(id, data, bones, animations) {
 	return json
 }
 
-THREE.LoadWar3Mdl = function(url, callback) {
+THREE.LoadWar3Mdl = function(url, callback, texturePath) {
 	$.get(url, function(text) {
 		var words = getWords(text, 0),
 			object = getObject(words),
@@ -496,8 +496,8 @@ THREE.LoadWar3Mdl = function(url, callback) {
 					var m = materials[data.extra.MaterialID],
 						t = textures[m.TextureID]
 					if (t && t.path) {
-						var fname = t.path.split('\\').pop().replace(/\.\w+$/g, '.png')
-							texture = THREE.ImageUtils.loadTexture('png/'+fname, new THREE.UVMapping())
+						var fname = texturePath ? (texturePath.call ? texturePath(t.path) : texturePath+t.path) : t.path,
+							texture = THREE.ImageUtils.loadTexture(fname, new THREE.UVMapping())
 						texture.flipY = false
 						mat = new THREE.MeshPhongMaterial({ map:texture, alphaTest:0.5, side:m.TwoSided ? THREE.DoubleSide : THREE.FrontSide })
 					}
