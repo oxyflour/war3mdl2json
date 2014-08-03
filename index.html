@@ -58,7 +58,7 @@ render()
 if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.txt', function(geos, anims) {
 	// update texturePath
 	geos.forEach(function(geo) {
-		geo.extra.texturePath = geo.extra.texturePath ? 'png/' + geo.extra.texturePath.split('\\').pop().replace(/\.\w+$/g, '.png') : ''
+		geo.extra.TexturePath = geo.extra.TexturePath ? 'png/' + geo.extra.TexturePath.split('\\').pop().replace(/\.\w+$/g, '.png') : ''
 	})
 	var model = new THREE.W3Character(geos)
 

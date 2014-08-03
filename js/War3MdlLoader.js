@@ -519,18 +519,20 @@ THREE.W3Character = function(geometries) {
 	this.root = new THREE.Object3D()
 
 	for (var i = 0, geo; geo = geometries[i]; i ++) {
-		// create material
-		var mat = null
-		if (geo.extra.TexturePath) {
-			var texture = THREE.ImageUtils.loadTexture(geo.extra.texturePath, new THREE.UVMapping())
-			texture.flipY = false
-			mat = new THREE.MeshPhongMaterial({ map:texture, alphaTest:0.5, side:geo.extra.TwoSided ? THREE.DoubleSide : THREE.FrontSide })
+		var mat = geo.MaterialCache
+		if (!mat) {
+			if (geo.extra.TexturePath) {
+				var texture = THREE.ImageUtils.loadTexture(geo.extra.TexturePath, new THREE.UVMapping())
+				texture.flipY = false
+				mat = new THREE.MeshPhongMaterial({ map:texture, alphaTest:0.5, side:geo.extra.TwoSided ? THREE.DoubleSide : THREE.FrontSide })
+			}
+			else {
+				mat = new THREE.MeshBasicMaterial()
+			}
+			mat.skinning = true
+			// cache the material
+			geo.MaterialCache = mat
 		}
-		else {
-			mat = new THREE.MeshBasicMaterial()
-		}
-		// Necessary for animations!
-		mat.skinning = true
 
 		var mesh = new THREE.SkinnedMesh(geo, mat)
 		this.root.add(mesh)
