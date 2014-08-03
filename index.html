@@ -55,14 +55,20 @@ render()
 </script>
 <script>
 
-if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.txt', function(model) {
+if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')+'.txt', function(geos, anims) {
+	// update texturePath
+	geos.forEach(function(geo) {
+		geo.extra.texturePath = geo.extra.texturePath ? 'png/' + geo.extra.texturePath.split('\\').pop().replace(/\.\w+$/g, '.png') : ''
+	})
+	var model = new THREE.W3Character(geos)
+
 	// move model to center
-	var box = new THREE.BoundingBoxHelper(model, 0xff0000)
+	var box = new THREE.BoundingBoxHelper(model.root, 0xff0000)
 	box.update()
-	model.position.z = -(box.box.min.z + box.box.max.z) / 2
+	model.root.position.z = -(box.box.min.z + box.box.max.z) / 2
 
 	// add model
-	game.scene.add(model)
+	game.scene.add(model.root)
 	game.objects.push(model)
 
 	// add another light
@@ -76,11 +82,9 @@ if (location.search) THREE.LoadWar3Mdl('mdl/'+location.search.replace(/^\?/, '')
 		model.playAnimation(this.value)
 	})
 	select.append('<option value="">Animate...</option>')
-	model.animations.forEach(function(d) {
+	anims.forEach(function(d) {
 		select.append('<option value="'+d.name+'">'+d.name+'</option>')
 	})
-}, function(path) {
-	return 'png/' + path.split('\\').pop().replace(/\.\w+$/g, '.png')
 })
 
 $.get('mdls.txt', function(text) {

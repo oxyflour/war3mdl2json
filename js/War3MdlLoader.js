@@ -420,11 +420,11 @@ function getGeometryJson(id, data, bones, animations) {
 	return json
 }
 
-THREE.LoadWar3Mdl = function(url, callback, texturePath) {
+THREE.LoadWar3Mdl = function(url, callback) {
 	$.get(url, function(text) {
 		var words = getWords(text, 0),
 			object = getObject(words),
-			model = new THREE.Object3D()
+			geometries = [ ]
 
 		// Bones and helpers require pivot points for their positions
 		var pivots = [ ]
@@ -482,78 +482,97 @@ THREE.LoadWar3Mdl = function(url, callback, texturePath) {
 		}
 
 		// create geometry
-		var geoId = 0
+		var geometries = [ ]
 		for (var i = 0, o = null; o = object[i]; i ++) {
 			if (o[0] == 'Geoset') {
-				var data = getGeometryJson(geoId ++, o[1], bones, animations),
+				var geoId = geometries.length,
+					data = getGeometryJson(geoId, o[1], bones, animations),
 					loader = new THREE.JSONLoader(),
 					result = loader.parse(data),
 					geo = result.geometry
-				console.log(data)
 
-				var mat = null
+				geo.extra = data.extra
 				if (materials[data.extra.MaterialID]) {
 					var m = materials[data.extra.MaterialID],
 						t = textures[m.TextureID]
-					if (t && t.path) {
-						var fname = texturePath ? (texturePath.call ? texturePath(t.path) : texturePath+t.path) : t.path,
-							texture = THREE.ImageUtils.loadTexture(fname, new THREE.UVMapping())
-						texture.flipY = false
-						mat = new THREE.MeshPhongMaterial({ map:texture, alphaTest:0.5, side:m.TwoSided ? THREE.DoubleSide : THREE.FrontSide })
-					}
+					geo.extra.TwoSided = m.TwoSided
+					geo.extra.TexturePath = t && t.path
 				}
-				if (!mat)
-					mat = new THREE.MeshBasicMaterial()
-				// Necessary for animations!
-				mat.skinning = true
 
-				var mesh = new THREE.SkinnedMesh(geo, mat)
-				model.add(mesh)
-
-				// setup global animation
-				data.extra.GlobalAnims.forEach(function(d) {
-					if (d.keyFrames > 1)
-						new THREE.Animation(mesh, d).play()
-				})
+				geometries.push(geo)
 			}
 		}
 
-		model.playAnimation = function(name) {
-			this.children.forEach(function(mesh) {
-				if (!mesh.animations)
-					mesh.animations = { }
-				if (!mesh.animations[name]) {
-					for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
-						if (d && d.name == name) {
-							mesh.animations[name] = new THREE.Animation(mesh, d)
-							break
-						}
+		geometries.geoAnims = geoAnims
+		callback(geometries, animations)
+	})
+}
+
+function simpleClone(data) {
+	var clone = { }
+	for (var k in data)
+		clone[k] = data[k]
+	return clone
+}
+
+THREE.W3Character = function(geometries) {
+	this.root = new THREE.Object3D()
+
+	for (var i = 0, geo; geo = geometries[i]; i ++) {
+		// create material
+		var mat = null
+		if (geo.extra.TexturePath) {
+			var texture = THREE.ImageUtils.loadTexture(geo.extra.texturePath, new THREE.UVMapping())
+			texture.flipY = false
+			mat = new THREE.MeshPhongMaterial({ map:texture, alphaTest:0.5, side:geo.extra.TwoSided ? THREE.DoubleSide : THREE.FrontSide })
+		}
+		else {
+			mat = new THREE.MeshBasicMaterial()
+		}
+		// Necessary for animations!
+		mat.skinning = true
+
+		var mesh = new THREE.SkinnedMesh(geo, mat)
+		this.root.add(mesh)
+
+		// setup global animation
+		geo.extra.GlobalAnims.forEach(function(anim) {
+			if (anim.keyFrames > 1)
+				new THREE.Animation(mesh, simpleClone(anim)).play()
+		})
+	}
+
+	this.playAnimation = function(name) {
+		this.root.children.forEach(function(mesh) {
+			if (!mesh.animations)
+				mesh.animations = { }
+			if (!mesh.animations[name]) {
+				for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
+					if (d && d.name == name) {
+						mesh.animations[name] = new THREE.Animation(mesh, simpleClone(d))
+						break
 					}
 				}
-				if (mesh.animPlaying !== mesh.animations[name]) {
-					if (mesh.animPlaying)
-						mesh.animPlaying.stop()
-					if (mesh.animPlaying = mesh.animations[name])
-						mesh.animPlaying.play()
-				}
-			})
-		}
+			}
+			if (mesh.animPlaying !== mesh.animations[name]) {
+				if (mesh.animPlaying)
+					mesh.animPlaying.stop()
+				if (mesh.animPlaying = mesh.animations[name])
+					mesh.animPlaying.play()
+			}
+		})
+	}
 
-		model.updateGeoAnim = function(dt) {
-			this.geoAnims.forEach(function(a) {
-				var mesh = model.children[a.target],
-					anim = mesh.animPlaying
-				if (anim) {
-					mesh.material.opacity = a.alpha.length > 0 ?
-						interpArray(a.alpha, anim.data.beginFrame + anim.currentTime*1000) : 1
-				}
-			})
+	this.updateGeoAnim = function(dt) {
+		for (var i = 0, a; a = geometries.geoAnims[i]; i ++) {
+			var mesh = this.root.children[a.target],
+				anim = mesh.animPlaying
+			if (anim) {
+				mesh.material.opacity = a.alpha.length > 0 ?
+					interpArray(a.alpha, anim.data.beginFrame + anim.currentTime*1000) : 1
+			}
 		}
-
-		model.geoAnims = geoAnims
-		model.animations = animations
-		callback(model)
-	})
+	}
 }
 
 })(this.THREE || require('three'))
