@@ -602,7 +602,7 @@ THREE.W3Character = function(geometries) {
 		}
 	}
 
-	this.update = function(dt) {
+	this.beforeRender = function(dt) {
 		this.updateAnimation(dt)
 		this.updateGeoAnim(dt)
 	}

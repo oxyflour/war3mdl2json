@@ -45,7 +45,7 @@ function render() {
 	var dt = clock.getDelta()
 	THREE.AnimationHandler.update(dt)
 	game.objects.forEach(function(d) {
-		d.update(dt)
+		d.beforeRender(dt)
 	})
 	game.controls.update(dt)
 	game.renderer.render(game.scene, game.camera)
