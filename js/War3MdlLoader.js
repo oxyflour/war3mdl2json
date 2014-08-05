@@ -556,11 +556,36 @@ THREE.W3Character = function(geometries) {
 					}
 				}
 			}
-			if (mesh.animPlaying !== mesh.animations[name]) {
-				if (mesh.animPlaying)
-					mesh.animPlaying.stop()
-				if (mesh.animPlaying = mesh.animations[name])
-					mesh.animPlaying.play()
+			var anim = mesh.animPlaying
+			if (anim !== mesh.animations[name]) {
+				if (anim)
+					anim.weightDelta = -1/0.3
+				if (anim = mesh.animPlaying = mesh.animations[name]) {
+					anim.weightDelta =  1/0.3
+					anim.play()
+					// Note: set animation weight after calling play()
+					anim.weight = 0
+				}
+			}
+		})
+	}
+
+	this.updateAnimation = function(dt) {
+		this.root.children.forEach(function(mesh) {
+			for (var i = 0, a; a = mesh.geometry.animations[i]; i ++) {
+				var anim = mesh.animations && mesh.animations[a.name]
+				if (anim && anim.weightDelta) {
+					anim.weight += anim.weightDelta * dt
+					if (anim.weight > 1) {
+						anim.weight = 1
+						anim.weightDelta = 0
+					}
+					else if (anim.weight < 0) {
+						anim.weight = 0
+						anim.weightDelta = 0
+						anim.stop()
+					}
+				}
 			}
 		})
 	}
@@ -570,10 +595,16 @@ THREE.W3Character = function(geometries) {
 			var mesh = this.root.children[a.target],
 				anim = mesh.animPlaying
 			if (anim) {
+				// FIXME: only alpha is enabled
 				mesh.material.opacity = a.alpha.length > 0 ?
 					interpArray(a.alpha, anim.data.beginFrame + anim.currentTime*1000) : 1
 			}
 		}
+	}
+
+	this.update = function(dt) {
+		this.updateAnimation(dt)
+		this.updateGeoAnim(dt)
 	}
 }
 
