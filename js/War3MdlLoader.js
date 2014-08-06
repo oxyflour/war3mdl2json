@@ -558,7 +558,7 @@ THREE.W3Character = function(geometries) {
 				mesh.animList = [ ]
 			var anim = mesh.animPlaying
 			// Note: name may be an array (or object)
-			if (typeof name !== 'string') {
+			if (name && typeof name !== 'string') {
 				// if current playing is in the name object, then continue current animation
 				if (anim) {
 					if (anim.lastTime < anim.currentTime) {
