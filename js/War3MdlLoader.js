@@ -548,10 +548,13 @@ THREE.W3Character = function(geometries) {
 		this.root.children.forEach(function(mesh) {
 			if (!mesh.animations)
 				mesh.animations = { }
+			if (!mesh.animList)
+				mesh.animList = [ ]
 			if (!mesh.animations[name]) {
-				for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
+				if (mesh.geometry) for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
 					if (d && d.name == name) {
 						mesh.animations[name] = new THREE.Animation(mesh, simpleClone(d))
+						mesh.animList.push(mesh.animations[name])
 						break
 					}
 				}
@@ -572,9 +575,8 @@ THREE.W3Character = function(geometries) {
 
 	this.updateAnimation = function(dt) {
 		this.root.children.forEach(function(mesh) {
-			for (var i = 0, a; a = mesh.geometry.animations[i]; i ++) {
-				var anim = mesh.animations && mesh.animations[a.name]
-				if (anim && anim.weightDelta) {
+			if (mesh.animList) for (var i = 0, anim; anim = mesh.animList[i]; i ++) {
+				if (anim.weightDelta) {
 					anim.weight += anim.weightDelta * dt
 					if (anim.weight > 1) {
 						anim.weight = 1
