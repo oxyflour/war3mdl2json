@@ -110,10 +110,14 @@ function newMaterial(data) {
 function newAnimation(name, data) {
 	var animation = { }
 	animation.name = name
+	animation.loop = true
 	for (var j = 0, e = null; e = data[j]; j ++) {
 		if (e[0] == 'Interval') {
 			animation.begin = parseInt(e[1][0])
 			animation.end = parseInt(e[1][1])
+		}
+		else if (e == 'NonLooping') {
+			animation.loop = false
 		}
 	}
 	return animation
@@ -275,6 +279,7 @@ function newAnim(bones, animation) {
 	var anim = { }
 	anim.global = animation.gid >= 0
 	anim.name = animation.name
+	anim.loop = animation.loop
 	anim.fps = 30
 	anim.length = (animation.end - animation.begin) / 1000
 	anim.hierarchy = [ ]
@@ -537,10 +542,11 @@ THREE.W3Character = function(geometries) {
 		var mesh = new THREE.SkinnedMesh(geo, mat)
 		this.root.add(mesh)
 
+		// Note: normal weight blending is not correct, still looking for a new solution
 		// setup global animation
 		geo.extra.GlobalAnims.forEach(function(anim) {
-			if (anim.keyFrames > 1)
-				new THREE.Animation(mesh, simpleClone(anim)).play()
+			//if (anim.keyFrames > 1)
+			//	new THREE.Animation(mesh, simpleClone(anim)).play()
 		})
 	}
 
@@ -550,24 +556,40 @@ THREE.W3Character = function(geometries) {
 				mesh.animations = { }
 			if (!mesh.animList)
 				mesh.animList = [ ]
+			var anim = mesh.animPlaying
+			// Note: name may be an array (or object)
+			if (typeof name !== 'string') {
+				// if current playing is in the name object, then continue current animation
+				if (anim) {
+					if (anim.lastTime < anim.currentTime) {
+						var n = anim.data.name
+						if (name[n] >= 0 || name.indexOf(n) >= 0)
+							name = n
+					}
+					anim.lastTime = anim.currentTime
+				}
+				// if name is an array, start a random animation in it
+				if (name.forEach) {
+					name = name[Math.floor(Math.random() * name.length)]
+				}
+			}
 			if (!mesh.animations[name]) {
-				if (mesh.geometry) for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
+				if (mesh.geometry && mesh.geometry.animations) for (var i = 0, d; d = mesh.geometry.animations[i]; i ++) {
 					if (d && d.name == name) {
-						mesh.animations[name] = new THREE.Animation(mesh, simpleClone(d))
-						mesh.animList.push(mesh.animations[name])
+						var a = mesh.animations[name] = new THREE.Animation(mesh, simpleClone(d))
+						mesh.animList.push(a)
 						break
 					}
 				}
 			}
-			var anim = mesh.animPlaying
 			if (anim !== mesh.animations[name]) {
 				if (anim)
 					anim.weightDelta = -1/0.3
 				if (anim = mesh.animPlaying = mesh.animations[name]) {
 					anim.weightDelta =  1/0.3
+					var w = anim.weight
 					anim.play()
-					// Note: set animation weight after calling play()
-					anim.weight = 0
+					anim.weight = w
 				}
 			}
 		})
