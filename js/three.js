@@ -29362,6 +29362,9 @@ THREE.Animation.prototype.update = (function(){
 
 		for ( var h = 0, hl = this.hierarchy.length; h < hl; h ++ ) {
 
+			if ( this.data.hierarchy[ h ].weight === 0 )
+				continue;
+
 			var object = this.hierarchy[ h ];
 			var animationCache = object.animationCache[this.data.name];
 

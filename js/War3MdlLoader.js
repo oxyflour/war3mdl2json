@@ -334,6 +334,7 @@ function newAnim(bones, animation) {
 			e.pos[2] = e.trans[2] + d.rpos[2]
 		}
 		anim.hierarchy.push({
+			weight: anim.global && !ks.keyFrames ? 0 : 1,
 			keys: ks
 		})
 	}
@@ -569,7 +570,7 @@ THREE.W3Character = function(geometries) {
 		// setup global animation
 		geo.extra.GlobalAnims.forEach(function(anim) {
 			if (anim.keyFrames > 1)
-				new THREE.Animation(mesh, simpleClone(anim)).play(0)
+				new THREE.Animation(mesh, simpleClone(anim)).play()
 		})
 	}
 
