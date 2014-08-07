@@ -149,16 +149,52 @@ function flatenVector(object) {
 	}
 	return array
 }
-function flatenSkinIndex(object, influencesPerVertex, skinIndices, bones) {
+function flatenSkinIndex(object, influencesPerVertex, skinIndices, allBones) {
+	var bonesUsed = [ ]
+	function getBoneIndex(id) {
+		var k = '#' + id
+		if (bonesUsed[k] === undefined) {
+			bonesUsed[k] = bonesUsed.length
+			bonesUsed.push(id)
+		}
+		return bonesUsed[k]
+	}
+
 	var array = [ ]
 	for (var i = 0, d = null; d = object[i]; i ++) {
 		var id = parseFloat(d),
 			bids = skinIndices[id][1].map(parseFloat)
 		for (var j = 0; j < influencesPerVertex; j ++) {
 			var id = bids[j % bids.length]
-			array.push(bones['#' + id])
+			array.push(getBoneIndex(id))
 		}
 	}
+
+	bonesUsed.slice().forEach(function(id) {
+		while ((id = allBones['#'+id].parent) >= 0)
+			getBoneIndex(id)
+	})
+
+	allBones.used = bonesUsed.map(function(id) {
+		var bone = { }, origin = allBones['#' + id]
+		for (var k in origin)
+			bone[k] = origin[k]
+		bone.rpos = bone.pos.slice()
+
+		var parent = allBones['#' + bone.parent]
+		if (parent) {
+			bone.rpos[0] = bone.pos[0] - parent.pos[0]
+			bone.rpos[1] = bone.pos[1] - parent.pos[1]
+			bone.rpos[2] = bone.pos[2] - parent.pos[2]
+		}
+
+		bone.parent = bonesUsed['#' + bone.parent]
+		if (bone.parent === undefined)
+			bone.parent = -1
+
+		return bone
+	})
+
 	return array
 }
 function addFaces(array, object, flags) {
@@ -203,11 +239,7 @@ function interpArray(array, frame) {
 		return interpValue(prev, next, frame, array.type)
 }
 function getKeys(bone, begin, end, gid) {
-	var frames = { }
-	frames[begin] = true
-	frames[end] = true
-
-	function getFiltered(list) {
+	function getFiltered(list, frames) {
 		var sel = [ ]
 		if (gid >= 0 && gid !== list.gid)
 			return sel
@@ -218,8 +250,12 @@ function getKeys(bone, begin, end, gid) {
 			}
 		return sel
 	}
-	var rotations = getFiltered(bone.rotations)
-		translations = getFiltered(bone.translations)
+
+	var frames = { }
+	frames[begin] = true
+	frames[end] = true
+	var rotations = getFiltered(bone.rotations, frames)
+		translations = getFiltered(bone.translations, frames)
 
 	var sortedFrames = [ ]
 	for (var frame in frames)
@@ -298,7 +334,6 @@ function newAnim(bones, animation) {
 			e.pos[2] = e.trans[2] + d.rpos[2]
 		}
 		anim.hierarchy.push({
-			parent: d.parent,
 			keys: ks
 		})
 	}
@@ -325,7 +360,7 @@ function newGeoAnim(data) {
 	}
 	return anim
 }
-function getGeometryJson(id, data, bones, animations) {
+function getGeometryJson(id, data, allBones, animations) {
 	var json = {
 		metadata: {
 			formatVersion: 3.1,
@@ -358,17 +393,6 @@ function getGeometryJson(id, data, bones, animations) {
 		}
 	}
 
-	// set json bones
-	for (var i = 0, d = null; d = bones[i]; i ++) {
-		json.bones.push({
-			name: d.name,
-			parent: d.parent,
-			pos: d.rpos,
-			rotq: [0, 0, 0, 1],
-		})
-	}
-	json.metadata.bones = json.bones.length
-
 	// setup skin indices
 	var skinIndices = [ ]
 	for (var i = 0, d = null; d = data[i]; i ++) {
@@ -378,15 +402,6 @@ function getGeometryJson(id, data, bones, animations) {
 			for (var j = 0, e = null; e = skinIndices[j]; j ++)
 				json.influencesPerVertex = Math.max(e[1].length, json.influencesPerVertex)
 		}
-	}
-
-	// setup animations
-	for (var i = 0, d; d = animations[i]; i ++) {
-		var anim = newAnim(bones, d)
-		if (anim.global)
-			json.extra.GlobalAnims.push(anim)
-		else
-			json.animations.push(anim)
 	}
 
 	for (var i = 0, d = null; d = data[i]; i ++) {
@@ -403,7 +418,7 @@ function getGeometryJson(id, data, bones, animations) {
 			json.uvs = [flatenVector(d[2])]
 		}
 		else if (d[0] == 'VertexGroup') {
-			json.skinIndices = flatenSkinIndex(d[1], json.influencesPerVertex, skinIndices, bones)
+			json.skinIndices = flatenSkinIndex(d[1], json.influencesPerVertex, skinIndices, allBones)
 			json.skinWeights = json.skinIndices.map(function() { return 1 })
 		}
 		else if (d[0] == 'Faces') {
@@ -420,6 +435,28 @@ function getGeometryJson(id, data, bones, animations) {
 		else if (d[0] == 'MaterialID') {
 			json.extra.MaterialID = parseInt(d[1])
 		}
+	}
+
+	var bones = allBones.used
+	json.metadata.bones = bones.length
+
+	// set json bones
+	for (var i = 0, d = null; d = bones[i]; i ++) {
+		json.bones.push({
+			name: d.name,
+			parent: d.parent,
+			pos: d.rpos,
+			rotq: [0, 0, 0, 1],
+		})
+	}
+
+	// setup animations
+	for (var i = 0, d; d = animations[i]; i ++) {
+		var anim = newAnim(bones, d)
+		if (anim.global)
+			json.extra.GlobalAnims.push(anim)
+		else
+			json.animations.push(anim)
 	}
 
 	return json
@@ -467,22 +504,8 @@ THREE.LoadWar3Mdl = function(url, callback) {
 			}
 			else if (o[0] == 'Bone' || o[0] == 'Helper') {
 				var bone = newBone(o[1], o[2], pivots)
-				bones['#' + bone.id] = bones.length
 				bones.push(bone)
-			}
-		}
-
-		for (var i = 0, d; d = bones[i]; i ++) {
-			// update parent id
-			var parent = bones['#' + d.parent]
-			d.parent = parent >= 0 ? parent : -1
-			// get relative bone postion
-			d.rpos = d.pos.slice()
-			var p = bones[d.parent]
-			if (p) {
-				d.rpos[0] = d.pos[0] - p.pos[0]
-				d.rpos[1] = d.pos[1] - p.pos[1]
-				d.rpos[2] = d.pos[2] - p.pos[2]
+				bones['#' + bone.id] = bone
 			}
 		}
 
@@ -545,8 +568,8 @@ THREE.W3Character = function(geometries) {
 		// Note: normal weight blending is not correct, still looking for a new solution
 		// setup global animation
 		geo.extra.GlobalAnims.forEach(function(anim) {
-			//if (anim.keyFrames > 1)
-			//	new THREE.Animation(mesh, simpleClone(anim)).play()
+			if (anim.keyFrames > 1)
+				new THREE.Animation(mesh, simpleClone(anim)).play(0)
 		})
 	}
 
@@ -587,9 +610,7 @@ THREE.W3Character = function(geometries) {
 					anim.weightDelta = -1/0.3
 				if (anim = mesh.animPlaying = mesh.animations[name]) {
 					anim.weightDelta =  1/0.3
-					var w = anim.weight
-					anim.play()
-					anim.weight = w
+					anim.play(anim.currentTime, anim.weight)
 				}
 			}
 		})
