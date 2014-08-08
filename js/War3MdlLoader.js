@@ -570,7 +570,7 @@ THREE.W3Character = function(geometries) {
 		// setup global animation
 		geo.extra.GlobalAnims.forEach(function(anim) {
 			if (anim.keyFrames > 1)
-				new THREE.Animation(mesh, simpleClone(anim)).play()
+				new THREE.Animation(mesh, simpleClone(anim)).play(0, anim.weight || 2)
 		})
 	}
 
