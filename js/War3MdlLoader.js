@@ -574,7 +574,7 @@ THREE.W3Character = function(geometries) {
 		})
 	}
 
-	this.playAnimation = function(name) {
+	this.playAnimation = function(name, speed) {
 		this.root.children.forEach(function(mesh) {
 			if (!mesh.animations)
 				mesh.animations = { }
@@ -613,6 +613,9 @@ THREE.W3Character = function(geometries) {
 					anim.weightDelta =  1/0.3
 					anim.play(anim.currentTime, anim.weight)
 				}
+			}
+			if (mesh.animPlaying && speed) {
+				mesh.animPlaying.timeScale = speed
 			}
 		})
 	}
